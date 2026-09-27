@@ -1,0 +1,14 @@
+{
+  "id": "order-counter",
+  "name": "Цель продаж на день",
+  "version": "1.0.0",
+  "author": "FunPay Flux",
+  "description": "Считает выручку за день и присылает уведомление, когда достигнута твоя цель. Показывает, как работать с заказами, хранилищем и уведомлениями.",
+  "icon": "🎯",
+  "main": "main.js",
+  "permissions": ["orders", "notify"],
+  "settings": [
+    { "key": "goal", "type": "number", "label": "Цель на день, ₽", "default": 3000 },
+    { "key": "notifyEach", "type": "toggle", "label": "Уведомлять о каждом заказе", "default": false }
+  ]
+}
