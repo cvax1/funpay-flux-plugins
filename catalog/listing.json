@@ -7,6 +7,6 @@
   "order-counter": {
     "price": 0,
     "category": "Продажи",
-    "hidden": true
+    "hidden": false
   }
 }
