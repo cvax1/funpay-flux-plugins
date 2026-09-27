@@ -1,0 +1,13 @@
+{
+  "id": "my-plugin",
+  "name": "Мой плагин",
+  "version": "1.0.0",
+  "author": "твой_ник",
+  "description": "Что делает плагин — одно-два предложения.",
+  "icon": "🧩",
+  "main": "main.js",
+  "permissions": ["chat"],
+  "settings": [
+    { "key": "answer", "type": "text", "label": "Текст ответа", "default": "Привет!" }
+  ]
+}
