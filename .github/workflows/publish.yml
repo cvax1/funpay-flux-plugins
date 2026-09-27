@@ -1,0 +1,53 @@
+# Публикация каталога на GitHub Pages: проверяет плагины, пакует zip, пишет catalog.json
+# и сообщает в Discord о новых версиях, которые ждут проверки.
+name: Опубликовать каталог
+
+on:
+  push:
+    branches: [main]
+    paths: ["plugins/**", "reviewed.json", "catalog/**", "admin/**", "scripts/**"]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Собрать каталог
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: node scripts/build.mjs
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4

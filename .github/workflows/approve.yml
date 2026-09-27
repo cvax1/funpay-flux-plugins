@@ -1,0 +1,46 @@
+# Одобрить плагин после проверки: Actions → «Одобрить плагин» → Run workflow → впиши id.
+# Отпечаток текущей версии записывается в reviewed.json, каталог пересобирается — у плагина появится ✅.
+# Если автор потом изменит код, отпечаток не совпадёт и значок снова станет «Не проверено».
+name: Одобрить плагин
+
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: "id плагина (имя папки в plugins/)"
+        required: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Записать отпечаток
+        env:
+          PLUGIN_ID: ${{ inputs.id }}
+        run: node scripts/approve.mjs
+
+      - name: Сохранить reviewed.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add reviewed.json
+          git commit -m "Одобрен плагин ${{ inputs.id }}" || echo "Уже одобрен"
+          git push
+
+  publish:
+    needs: approve
+    uses: ./.github/workflows/publish.yml
+    secrets: inherit

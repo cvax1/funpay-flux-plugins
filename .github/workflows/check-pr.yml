@@ -1,0 +1,51 @@
+# Проверка присланного плагина. Код плагина НЕ запускается: скрипт проверки берётся из основной ветки,
+# а файлы из PR только читаются. Результат — зелёная/красная галочка в PR и сообщение в Discord.
+name: Проверка плагина
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Скрипты проверки (основная ветка)
+        uses: actions/checkout@v4
+
+      - name: Файлы из PR (только чтение)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Список изменённых файлов
+        id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "list<<EOF"
+            gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate -q '.[].filename'
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Проверить plugin.json и сообщить в Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          PR_DIR: pr
+          BASE_DIR: .
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          CHANGED_FILES: ${{ steps.files.outputs.list }}
+        run: node scripts/check-pr.mjs
