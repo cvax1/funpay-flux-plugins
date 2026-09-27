@@ -5,8 +5,7 @@
     "featured": true
   },
   "order-counter": {
-    "price": 0,
     "category": "Продажи",
-    "hidden": false
+    "price": 99
   }
 }
