@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Админка плагинов</title>
+<style>
+  :root {
+    --bg: #0d0e12; --panel: #15171d; --panel-2: #1b1e26; --line: #262a35; --text: #e7e9ee; --muted: #8b90a0;
+    --accent: #8b5cf6; --accent-2: #22d3ee; --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+    --grad: linear-gradient(135deg, #8b5cf6, #22d3ee);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
+  a { color: var(--accent-2); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  header h1 { font-size: 20px; margin: 0; flex: 1; }
+  header h1 b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--text); border-radius: 10px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  .btn:hover { border-color: #3a4050; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.primary { background: var(--grad); border: none; color: #fff; font-weight: 600; }
+  .btn.danger { color: var(--err); }
+  .btn.active { border-color: var(--accent); }
+  .btn.sm { padding: 5px 10px; font-size: 13px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .muted { color: var(--muted); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; flex: 1; min-width: 160px; }
+  .field > span { font-size: 12px; color: var(--muted); }
+  .input { width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: inherit; outline: none; }
+  .input:focus { border-color: var(--accent); }
+  textarea.input { resize: vertical; }
+  .check { display: flex; gap: 8px; align-items: center; margin: 6px 0; cursor: pointer; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px; border-radius: 999px; font-size: 12px; background: rgba(139,144,160,.15); color: var(--muted); }
+  .badge.ok { background: rgba(52,211,153,.15); color: var(--ok); }
+  .badge.warn { background: rgba(251,191,36,.15); color: var(--warn); }
+  .badge.err { background: rgba(248,113,113,.15); color: var(--err); }
+  .badge.price { background: rgba(139,92,246,.18); color: #c4b5fd; }
+  .spin { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--warn); border-right-color: transparent; animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .plugin-head { display: flex; gap: 12px; align-items: flex-start; }
+  .icon { font-size: 26px; width: 44px; height: 44px; display: grid; place-items: center; background: var(--panel-2); border-radius: 12px; flex: none; }
+  .name { font-weight: 600; font-size: 15px; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .errors { color: var(--err); margin: 8px 0; padding-left: 18px; }
+  pre.code { background: #0a0b0e; border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow: auto; max-height: 60vh; font: 12.5px/1.5 Consolas, monospace; white-space: pre; }
+  .key-out { word-break: break-all; font: 12.5px Consolas, monospace; background: #0a0b0e; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: top; }
+  th { color: var(--muted); font-weight: 400; }
+  .toast { position: fixed; right: 16px; bottom: 16px; max-width: 420px; background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 10px; padding: 10px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.4); z-index: 20; }
+  .toast.err { border-left-color: var(--err); }
+  .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; z-index: 10; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; width: min(900px, 100%); max-height: 90vh; overflow: auto; }
+  .login { max-width: 520px; margin: 60px auto; }
+  ol li { margin-bottom: 6px; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+<script>
+"use strict";
+// Админ-панель каталога плагинов FunPay Flux.
+// Всё хранится в твоём репозитории GitHub: страница читает и сохраняет файлы через GitHub API твоим токеном.
+// Токен и секретный ключ лицензий лежат только в этом браузере (localStorage) и никуда больше не отправляются.
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const LS = { cfg: "fpfa_cfg", key: "fpfa_license_key", issued: "fpfa_issued", hashes: "fpfa_hashes" };
+const PERMS = { chat: "💬 чат: читать и отвечать", orders: "💰 заказы", reviews: "⭐ отзывы", notify: "🔔 уведомления", network: "🌐 интернет" };
+const FIELD_TYPES = ["text", "textarea", "number", "toggle", "select"];
+
+// адрес API можно подменить только на локальный (для проверки админки без настоящего GitHub)
+const API = (() => { const a = new URLSearchParams(location.search).get("api"); return a && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(a) ? a : "https://api.github.com"; })();
+const load = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } };
+const store = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+let cfg = load(LS.cfg, { repo: "", token: "" });
+let state = null; // { branch, plugins: [...], reviewed, listing, settings }
+let tab = "plugins";
+let pendingZip = null; // { files, manifest, errors, hash }
+
+function toast(text, err = false) {
+  const t = document.createElement("div");
+  t.className = "toast" + (err ? " err" : "");
+  t.textContent = text;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), err ? 7000 : 3500);
+}
+async function busy(btn, fn) {
+  const text = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = "Подожди…"; }
+  try { return await fn(); }
+  catch (e) { toast(e.message, true); console.error(e); }
+  finally { if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = text; } }
+}
+
+// ---------- байты, base64, хеши ----------
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+function b64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }
+const unb64 = (s) => Uint8Array.from(atob(s.replace(/\s/g, "")), (c) => c.charCodeAt(0));
+const b64url = (bytes) => b64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+const sha256 = async (bytes) => hex(await crypto.subtle.digest("SHA-256", bytes));
+
+// тот же алгоритм, что в scripts/lib.mjs и в приложении (contentHash)
+async function contentHash(files) {
+  let s = "";
+  for (const f of [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))) s += f.path + "\n" + (f.sha256 || (await sha256(f.data))) + "\n";
+  return sha256(enc.encode(s));
+}
+
+// ---------- zip ----------
+async function inflateRaw(bytes) {
+  const ds = new DecompressionStream("deflate-raw");
+  const out = new Response(new Blob([bytes]).stream().pipeThrough(ds));
+  return new Uint8Array(await out.arrayBuffer());
+}
+async function unzip(buf) {
+  const u = new Uint8Array(buf);
+  const v = new DataView(buf);
+  let eocd = -1;
+  for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--) if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error("Это не zip-архив");
+  const count = v.getUint16(eocd + 10, true);
+  let p = v.getUint32(eocd + 16, true);
+  const files = [];
+  for (let n = 0; n < count; n++) {
+    const method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+    const nl = v.getUint16(p + 28, true), el = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), local = v.getUint32(p + 42, true);
+    const name = dec.decode(u.subarray(p + 46, p + 46 + nl)).replace(/\\/g, "/");
+    p += 46 + nl + el + cl;
+    if (name.endsWith("/")) continue;
+    if (name.startsWith("/") || name.split("/").includes("..")) throw new Error(`Недопустимый путь в архиве: ${name}`);
+    const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+    const raw = u.subarray(start, start + csize);
+    const data = method === 0 ? raw.slice() : method === 8 ? await inflateRaw(raw) : null;
+    if (!data) throw new Error(`Неподдерживаемое сжатие (${method})`);
+    files.push({ path: name, data });
+  }
+  const roots = new Set(files.map((f) => f.path.split("/")[0]));
+  if (!files.some((f) => f.path === "plugin.json") && roots.size === 1 && files.every((f) => f.path.includes("/"))) {
+    const root = [...roots][0] + "/";
+    files.forEach((f) => (f.path = f.path.slice(root.length)));
+  }
+  return files.filter((f) => !/(^|\/)(\.DS_Store|__MACOSX\/)/.test(f.path));
+}
+
+function validateManifest(m) {
+  const errors = [];
+  if (!m || typeof m !== "object") return ["plugin.json не читается как JSON-объект"];
+  if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(m.id || "")) errors.push("id: латиница в нижнем регистре, цифры и дефис");
+  if (!m.name || String(m.name).length > 60) errors.push("name: название до 60 символов");
+  if (!/^\d+\.\d+\.\d+$/.test(m.version || "")) errors.push("version: в формате 1.0.0");
+  if (!m.author) errors.push("author: ник автора");
+  if (!m.description) errors.push("description: что делает плагин");
+  for (const p of m.permissions || []) if (!PERMS[p]) errors.push(`permissions: неизвестное «${p}»`);
+  for (const f of m.settings || []) if (!FIELD_TYPES.includes(f?.type)) errors.push(`settings.${f?.key}: неверный type`);
+  return errors;
+}
+function checkFiles(files) {
+  const errors = [];
+  const mf = files.find((f) => f.path === "plugin.json");
+  let manifest = null;
+  if (!mf) errors.push("нет plugin.json");
+  else {
+    try { manifest = JSON.parse(dec.decode(mf.data)); errors.push(...validateManifest(manifest)); }
+    catch (e) { errors.push("plugin.json — не JSON: " + e.message); }
+    const main = manifest?.main || "main.js";
+    if (manifest && !files.some((f) => f.path === main)) errors.push(`нет главного файла ${main}`);
+  }
+  if (files.some((f) => /\.(exe|dll|node|bat|cmd|ps1|sh)$/i.test(f.path))) errors.push("в плагине есть исполняемые файлы");
+  if (files.reduce((n, f) => n + f.data.length, 0) > 5 * 1024 * 1024) errors.push("плагин больше 5 МБ");
+  return { manifest, errors };
+}
+
+// ---------- GitHub ----------
+async function gh(method, path, body) {
+  const r = await fetch(API + path, {
+    method,
+    headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
+  if (r.status === 401) throw new Error("GitHub не принял токен — войди заново");
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    throw new Error(`GitHub: ${j.message || r.status}${r.status === 403 || r.status === 404 ? " (проверь права токена)" : ""}`);
+  }
+  return r.status === 204 ? null : r.json();
+}
+const R = () => `/repos/${cfg.repo}`;
+async function readBlobText(sha) { return dec.decode(unb64((await gh("GET", `${R()}/git/blobs/${sha}`)).content)); }
+async function readBlobBytes(sha) { return unb64((await gh("GET", `${R()}/git/blobs/${sha}`)).content); }
+
+/** Один коммит: changes = [{ path, data: Uint8Array | string | null (удалить) }] */
+async function commit(changes, message) {
+  const ref = await gh("GET", `${R()}/git/ref/heads/${state.branch}`);
+  const head = await gh("GET", `${R()}/git/commits/${ref.object.sha}`);
+  const tree = [];
+  for (const c of changes) {
+    if (c.data === null) { tree.push({ path: c.path, mode: "100644", type: "blob", sha: null }); continue; }
+    const bytes = typeof c.data === "string" ? enc.encode(c.data) : c.data;
+    const blob = await gh("POST", `${R()}/git/blobs`, { content: b64(bytes), encoding: "base64" });
+    tree.push({ path: c.path, mode: "100644", type: "blob", sha: blob.sha });
+  }
+  const t = await gh("POST", `${R()}/git/trees`, { base_tree: head.tree.sha, tree });
+  const cm = await gh("POST", `${R()}/git/commits`, { message, tree: t.sha, parents: [ref.object.sha] });
+  await gh("PATCH", `${R()}/git/refs/heads/${state.branch}`, { sha: cm.sha });
+}
+const json = (o) => JSON.stringify(o, null, 2) + "\n";
+
+// ---------- загрузка данных ----------
+async function loadState() {
+  const repo = await gh("GET", R());
+  const branch = repo.default_branch;
+  const ref = await gh("GET", `${R()}/git/ref/heads/${branch}`);
+  const tree = (await gh("GET", `${R()}/git/trees/${ref.object.sha}?recursive=1`)).tree;
+  const blob = (p) => tree.find((x) => x.path === p && x.type === "blob");
+  const readJson = async (p, def) => { const b = blob(p); if (!b) return def; try { return JSON.parse(await readBlobText(b.sha)); } catch { return def; } };
+  const hashCache = load(LS.hashes, {});
+  const ids = [...new Set(tree.filter((x) => x.type === "blob" && x.path.startsWith("plugins/")).map((x) => x.path.split("/")[1]))];
+  const plugins = [];
+  for (const id of ids) {
+    const files = tree.filter((x) => x.type === "blob" && x.path.startsWith(`plugins/${id}/`)).map((x) => ({ path: x.path.slice(`plugins/${id}/`.length), sha: x.sha, size: x.size }));
+    let manifest = null;
+    const mf = files.find((f) => f.path === "plugin.json");
+    try { manifest = mf ? JSON.parse(await readBlobText(mf.sha)) : null; } catch {}
+    // отпечаток содержимого: sha256 каждого файла кешируем по git-sha (файл с тем же git-sha не меняется)
+    for (const f of files) {
+      if (!hashCache[f.sha]) hashCache[f.sha] = await sha256(await readBlobBytes(f.sha));
+      f.sha256 = hashCache[f.sha];
+    }
+    plugins.push({ id, files, manifest, errors: manifest ? validateManifest(manifest) : ["нет plugin.json"], hash: await contentHash(files) });
+  }
+  store(LS.hashes, hashCache);
+  state = {
+    repoName: repo.full_name,
+    pagesUrl: `https://${repo.owner.login.toLowerCase()}.github.io/${repo.name}`,
+    branch,
+    plugins,
+    reviewed: await readJson("reviewed.json", {}),
+    listing: await readJson("catalog/listing.json", {}),
+    settings: await readJson("catalog/settings.json", { storeName: "Каталог плагинов FunPay Flux", currency: "₽", licensePublicKey: "", revoked: [] }),
+  };
+}
+const approved = (p) => p.manifest && state.reviewed[`${p.id}@${p.manifest.version}`] === p.hash;
+const saved = () => toast("Сохранено ✓ Каталог обновится примерно через минуту (GitHub Actions)");
+
+// ---------- экраны ----------
+function render() {
+  const root = $("#root");
+  if (!cfg.repo || !cfg.token || !state) return renderLogin(root);
+  const tabBtn = (id, text) => `<button class="btn ${tab === id ? "active" : ""}" data-tab="${id}">${text}</button>`;
+  root.innerHTML = `
+    <header><h1>🧩 Админка · <b>${esc(state.settings.storeName || "каталог")}</b></h1>
+      <a class="btn sm" href="${esc(state.pagesUrl)}/catalog.json" target="_blank">catalog.json</a>
+      <a class="btn sm" href="https://github.com/${esc(state.repoName)}/actions" target="_blank">Actions</a>
+      <button class="btn sm" id="publish">🚀 Опубликовать сейчас</button>
+      <button class="btn sm" id="reload">🔄</button>
+      <button class="btn sm danger" id="logout">Выйти</button></header>
+    <div class="tabs">${tabBtn("plugins", `Плагины (${state.plugins.length})`)}${tabBtn("add", "➕ Добавить плагин")}${tabBtn("keys", "🔑 Ключи для платных")}${tabBtn("settings", "⚙ Настройки")}</div>
+    <div id="view"></div>`;
+  $$("[data-tab]").forEach((b) => (b.onclick = () => ((tab = b.dataset.tab), render())));
+  $("#reload").onclick = (e) => busy(e.target, async () => { await loadState(); render(); });
+  $("#logout").onclick = () => { if (confirm("Выйти? Токен будет удалён из этого браузера (ключ лицензий останется).")) { cfg = { repo: cfg.repo, token: "" }; store(LS.cfg, cfg); state = null; render(); } };
+  $("#publish").onclick = (e) => busy(e.target, async () => { await gh("POST", `${R()}/actions/workflows/publish.yml/dispatches`, { ref: state.branch }); toast("Сборка каталога запущена — около минуты"); });
+  ({ plugins: viewPlugins, add: viewAdd, keys: viewKeys, settings: viewSettings })[tab]($("#view"));
+}
+
+function renderLogin(root) {
+  root.innerHTML = `<div class="login card">
+    <h2 style="margin-top:0">🧩 Админка каталога плагинов</h2>
+    <p class="muted">Нужен токен GitHub с доступом к репозиторию каталога. Он хранится только в этом браузере.</p>
+    <ol class="muted">
+      <li>GitHub → Settings → Developer settings → <b>Fine-grained tokens</b> → Generate new token.</li>
+      <li>Repository access: <b>Only select repositories</b> → твой репозиторий каталога.</li>
+      <li>Permissions: <b>Contents — Read and write</b>, <b>Actions — Read and write</b>.</li>
+    </ol>
+    <label class="field"><span>Репозиторий (ник/название)</span><input class="input" id="l-repo" value="${esc(cfg.repo)}" placeholder="nick/funpay-flux-plugins"></label>
+    <label class="field"><span>Токен</span><input class="input" id="l-token" type="password" placeholder="github_pat_…" autocomplete="off"></label>
+    <button class="btn primary" id="l-go">Войти</button></div>`;
+  $("#l-go").onclick = (e) => busy(e.target, async () => {
+    cfg = { repo: $("#l-repo").value.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/$/, ""), token: $("#l-token").value.trim() || cfg.token };
+    if (!/^[\w.-]+\/[\w.-]+$/.test(cfg.repo)) throw new Error("Репозиторий в виде ник/название");
+    await loadState();
+    store(LS.cfg, cfg);
+    render();
+  });
+}
+
+function priceBadge(l) {
+  const price = Number(l.price) || 0;
+  return price ? `<span class="badge price">💰 ${price} ${esc(state.settings.currency || "₽")}</span>` : `<span class="badge ok">🆓 Бесплатно</span>`;
+}
+
+function viewPlugins(el) {
+  if (!state.plugins.length) { el.innerHTML = `<div class="card muted">Плагинов пока нет — добавь первый на вкладке «Добавить плагин».</div>`; return; }
+  el.innerHTML = `<div class="grid">${state.plugins.map((p) => {
+    const m = p.manifest || {};
+    const l = state.listing[p.id] || {};
+    return `<div class="card">
+      <div class="plugin-head"><div class="icon">${esc(l.icon || m.icon || "🧩")}</div><div style="flex:1">
+        <div class="name">${esc(l.name || m.name || p.id)}</div>
+        <div class="muted">v${esc(m.version || "?")} · ${esc(l.author || m.author || "?")} · <code>${esc(p.id)}</code></div></div></div>
+      <div class="row" style="margin-top:8px">
+        ${approved(p) ? `<span class="badge ok">✅ Проверено</span>` : `<span class="badge warn"><span class="spin"></span>Не проверено</span>`}
+        ${priceBadge(l)} ${l.hidden ? `<span class="badge err">скрыт</span>` : ""} ${l.featured ? `<span class="badge">⭐ в топе</span>` : ""} ${l.category ? `<span class="badge">${esc(l.category)}</span>` : ""}</div>
+      <p class="muted" style="margin:8px 0 0">${esc(l.description || m.description || "")}</p>
+      ${p.errors.length ? `<ul class="errors">${p.errors.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      <div class="muted" style="font-size:12px;margin-top:6px">Разрешения: ${(m.permissions || []).map((x) => PERMS[x] || x).join(", ") || "нет"}</div>
+      <div class="actions">
+        <button class="btn sm primary" data-edit="${esc(p.id)}">✏ Изменить</button>
+        ${approved(p) ? `<button class="btn sm" data-unapprove="${esc(p.id)}">Снять ✅</button>` : `<button class="btn sm" data-approve="${esc(p.id)}">✅ Одобрить</button>`}
+        <button class="btn sm" data-code="${esc(p.id)}">👁 Код</button>
+        <button class="btn sm" data-hide="${esc(p.id)}">${l.hidden ? "Показать" : "Скрыть"}</button>
+        <button class="btn sm danger" data-del="${esc(p.id)}">Удалить</button></div></div>`;
+  }).join("")}</div>`;
+  const find = (id) => state.plugins.find((p) => p.id === id);
+  $$("[data-edit]", el).forEach((b) => (b.onclick = () => openEdit(find(b.dataset.edit))));
+  $$("[data-code]", el).forEach((b) => (b.onclick = () => busy(b, () => openCode(find(b.dataset.code)))));
+  $$("[data-approve]", el).forEach((b) => (b.onclick = () => {
+    const p = find(b.dataset.approve);
+    if (p.errors.length) return toast("Сначала исправь ошибки в plugin.json", true);
+    if (!confirm(`Одобрить «${p.manifest.name}» v${p.manifest.version}? Подтверждаешь, что посмотрел код и протестировал.`)) return;
+    busy(b, async () => {
+      const reviewed = { ...state.reviewed, [`${p.id}@${p.manifest.version}`]: p.hash };
+      await commit([{ path: "reviewed.json", data: json(Object.fromEntries(Object.entries(reviewed).sort())) }], `Одобрен плагин ${p.id} v${p.manifest.version}`);
+      state.reviewed = reviewed; saved(); render();
+    });
+  }));
+  $$("[data-unapprove]", el).forEach((b) => (b.onclick = () => busy(b, async () => {
+    const p = find(b.dataset.unapprove);
+    const reviewed = { ...state.reviewed };
+    delete reviewed[`${p.id}@${p.manifest.version}`];
+    await commit([{ path: "reviewed.json", data: json(reviewed) }], `Снято одобрение ${p.id}`);
+    state.reviewed = reviewed; saved(); render();
+  })));
+  $$("[data-hide]", el).forEach((b) => (b.onclick = () => busy(b, async () => {
+    const id = b.dataset.hide;
+    const listing = { ...state.listing, [id]: { ...(state.listing[id] || {}), hidden: !state.listing[id]?.hidden } };
+    await commit([{ path: "catalog/listing.json", data: json(listing) }], `${listing[id].hidden ? "Скрыт" : "Показан"} плагин ${id}`);
+    state.listing = listing; saved(); render();
+  })));
+  $$("[data-del]", el).forEach((b) => (b.onclick = () => {
+    const p = find(b.dataset.del);
+    if (prompt(`Удалить плагин «${p.id}» из каталога навсегда? Впиши его id для подтверждения:`) !== p.id) return;
+    busy(b, async () => {
+      const listing = { ...state.listing }; delete listing[p.id];
+      await commit([...p.files.map((f) => ({ path: `plugins/${p.id}/${f.path}`, data: null })), { path: "catalog/listing.json", data: json(listing) }], `Удалён плагин ${p.id}`);
+      await loadState(); saved(); render();
+    });
+  }));
+}
+
+function listingForm(l, m) {
+  return `<div class="row">
+      <label class="field"><span>Название в каталоге</span><input class="input" data-l="name" value="${esc(l.name || "")}" placeholder="${esc(m.name || "")}"></label>
+      <label class="field" style="max-width:110px"><span>Значок</span><input class="input" data-l="icon" value="${esc(l.icon || "")}" placeholder="${esc(m.icon || "🧩")}"></label></div>
+    <div class="row">
+      <label class="field"><span>Автор (от кого)</span><input class="input" data-l="author" value="${esc(l.author || "")}" placeholder="${esc(m.author || "")}"></label>
+      <label class="field"><span>Категория</span><input class="input" data-l="category" value="${esc(l.category || "")}" placeholder="Чат, Продажи, Аренда…"></label></div>
+    <label class="field"><span>Описание</span><textarea class="input" rows="3" data-l="description" placeholder="${esc(m.description || "")}">${esc(l.description || "")}</textarea></label>
+    <div class="row">
+      <label class="field" style="max-width:200px"><span>Цена, ${esc(state.settings.currency || "₽")} (0 — бесплатно)</span><input class="input" type="number" min="0" step="1" data-l="price" value="${esc(l.price || 0)}"></label>
+      <label class="field"><span>Где купить (ссылка на лот FunPay, Telegram…)</span><input class="input" data-l="buyUrl" value="${esc(l.buyUrl || "")}" placeholder="https://funpay.com/lots/offer?id=…"></label></div>
+    <label class="check"><input type="checkbox" data-l="featured" ${l.featured ? "checked" : ""}> ⭐ Показывать в топе каталога</label>
+    <label class="check"><input type="checkbox" data-l="hidden" ${l.hidden ? "checked" : ""}> Скрыть из каталога</label>
+    <p class="muted" style="font-size:12px">Пустые поля — берутся из plugin.json автора. Платный плагин устанавливается только с ключом (вкладка «Ключи для платных»).</p>`;
+}
+function readListing(root) {
+  const l = {};
+  $$("[data-l]", root).forEach((i) => {
+    const k = i.dataset.l;
+    if (i.type === "checkbox") { if (i.checked) l[k] = true; }
+    else if (k === "price") { const n = Math.max(0, Math.round(Number(i.value) || 0)); if (n) l.price = n; }
+    else if (i.value.trim()) l[k] = i.value.trim();
+  });
+  if (l.buyUrl && !/^https:\/\//.test(l.buyUrl)) throw new Error("Ссылка «Где купить» должна начинаться с https://");
+  return l;
+}
+
+function modal(html) {
+  const back = document.createElement("div");
+  back.className = "modal-back";
+  back.innerHTML = `<div class="modal">${html}</div>`;
+  back.onclick = (e) => e.target === back && back.remove();
+  document.body.appendChild(back);
+  return back;
+}
+
+function openEdit(p) {
+  const m = p.manifest || {};
+  const l = state.listing[p.id] || {};
+  const back = modal(`<h3 style="margin-top:0">✏ ${esc(l.name || m.name || p.id)} <span class="muted">v${esc(m.version)}</span></h3>
+    ${listingForm(l, m)}
+    <div class="card" style="margin-top:10px"><b>Новая версия</b><p class="muted">Загрузи zip с новой версией — файлы плагина заменятся, одобрение слетит до проверки.</p>
+      <input type="file" id="e-zip" accept=".zip"></div>
+    <div class="row"><button class="btn primary" id="e-save">Сохранить</button><button class="btn" id="e-cancel">Отмена</button></div>`);
+  $("#e-cancel", back).onclick = () => back.remove();
+  $("#e-save", back).onclick = (e) => busy(e.target, async () => {
+    const listing = { ...state.listing, [p.id]: readListing(back) };
+    const changes = [{ path: "catalog/listing.json", data: json(listing) }];
+    const file = $("#e-zip", back).files[0];
+    if (file) {
+      const files = await unzip(await file.arrayBuffer());
+      const { manifest, errors } = checkFiles(files);
+      if (errors.length) throw new Error("В архиве ошибки: " + errors.join("; "));
+      if (manifest.id !== p.id) throw new Error(`В архиве плагин «${manifest.id}», а не «${p.id}»`);
+      p.files.forEach((f) => changes.push({ path: `plugins/${p.id}/${f.path}`, data: null }));
+      files.forEach((f) => changes.push({ path: `plugins/${p.id}/${f.path}`, data: f.data }));
+    }
+    await commit(changes, `Изменён плагин ${p.id}`);
+    back.remove();
+    await loadState(); saved(); render();
+  });
+}
+
+async function openCode(p) {
+  const texts = [];
+  for (const f of p.files) {
+    if (f.size > 300_000 || !/\.(js|mjs|cjs|json|md|txt|ts)$/i.test(f.path)) { texts.push(`// ${f.path} — ${f.size} байт (не показан)`); continue; }
+    texts.push(`// ======== ${f.path} ========\n${await readBlobText(f.sha)}`);
+  }
+  modal(`<div class="row" style="justify-content:space-between"><h3 style="margin:0">👁 Код: ${esc(p.id)}</h3><span class="muted">Проверь: нет ли fetch на чужие сайты с данными покупателей, спама, обмана</span></div>
+    <pre class="code">${esc(texts.join("\n\n"))}</pre>`);
+}
+
+function viewAdd(el) {
+  const z = pendingZip;
+  el.innerHTML = `<div class="card"><b>1. Zip-архив плагина</b>
+      <p class="muted">Внутри — plugin.json и main.js (можно в папке). Если плагин с таким id уже есть — это будет его новая версия.</p>
+      <input type="file" id="a-zip" accept=".zip"></div>
+    ${z ? `<div class="card"><b>2. Проверка</b>
+      ${z.errors.length ? `<ul class="errors">${z.errors.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>✅ <b>${esc(z.manifest.name)}</b> v${esc(z.manifest.version)} · ${esc(z.manifest.author)} · <code>${esc(z.manifest.id)}</code>${state.plugins.some((p) => p.id === z.manifest.id) ? ` <span class="badge warn">обновление</span>` : ` <span class="badge ok">новый</span>`}</p>
+        <p class="muted">Разрешения: ${(z.manifest.permissions || []).map((x) => PERMS[x] || x).join(", ") || "нет"} · файлов: ${z.files.length}</p>
+        <details><summary class="muted" style="cursor:pointer">Посмотреть код</summary><pre class="code">${esc(z.files.filter((f) => /\.(js|mjs|cjs|json)$/i.test(f.path)).map((f) => `// ======== ${f.path} ========\n${dec.decode(f.data)}`).join("\n\n"))}</pre></details>`}</div>
+      ${z.errors.length ? "" : `<div class="card"><b>3. Карточка в каталоге</b>${listingForm(state.listing[z.manifest.id] || {}, z.manifest)}
+        <label class="check"><input type="checkbox" id="a-approve"> ✅ Сразу одобрить (я посмотрел код и протестировал)</label>
+        <button class="btn primary" id="a-save">Опубликовать в каталоге</button></div>`}` : ""}`;
+  $("#a-zip").onchange = (e) => busy(null, async () => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const files = await unzip(await f.arrayBuffer());
+    const { manifest, errors } = checkFiles(files);
+    pendingZip = { files, manifest, errors, hash: errors.length ? null : await contentHash(files) };
+    render();
+  });
+  $("#a-save") && ($("#a-save").onclick = (e) => busy(e.target, async () => {
+    const { manifest, files, hash } = pendingZip;
+    const id = manifest.id;
+    const listing = { ...state.listing, [id]: readListing(el) };
+    const changes = [{ path: "catalog/listing.json", data: json(listing) }];
+    const old = state.plugins.find((p) => p.id === id);
+    old?.files.forEach((f) => changes.push({ path: `plugins/${id}/${f.path}`, data: null }));
+    files.forEach((f) => changes.push({ path: `plugins/${id}/${f.path}`, data: f.data }));
+    if ($("#a-approve").checked) changes.push({ path: "reviewed.json", data: json(Object.fromEntries(Object.entries({ ...state.reviewed, [`${id}@${manifest.version}`]: hash }).sort())) });
+    await commit(changes, `${old ? "Обновлён" : "Добавлен"} плагин ${id} v${manifest.version}`);
+    pendingZip = null;
+    tab = "plugins";
+    await loadState(); saved(); render();
+  }));
+}
+
+// ---------- ключи для платных плагинов (Ed25519) ----------
+async function importPrivate() {
+  const k = load(LS.key, null);
+  if (!k) return null;
+  return crypto.subtle.importKey("jwk", k, { name: "Ed25519" }, false, ["sign"]);
+}
+function download(name, text) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  a.download = name;
+  a.click();
+}
+function viewKeys(el) {
+  const k = load(LS.key, null);
+  const pub = state.settings.licensePublicKey;
+  const match = k && k.x === pub;
+  const paid = state.plugins.filter((p) => Number(state.listing[p.id]?.price) > 0);
+  const issued = load(LS.issued, []);
+  const revoked = new Set(state.settings.revoked || []);
+  el.innerHTML = `<div class="card"><b>Как это работает</b>
+      <p class="muted">Покупатель платит тебе (например, покупает лот на FunPay) и присылает свой <b>ID FunPay</b> — он виден в приложении, когда нажимаешь «У меня есть ключ». Ты выдаёшь ключ здесь, покупатель вставляет его в приложение. Ключ подписан твоим секретным ключом — подделать его нельзя, а с ID покупателя он не заработает у другого человека.</p></div>
+    <div class="card"><b>Секретный ключ подписи</b>
+      ${!k ? `<p class="muted">Ещё не создан. Создай один раз и <b>обязательно сохрани резервную копию</b> — без неё не сможешь выдавать ключи с другого устройства.</p>
+        <div class="row"><button class="btn primary" id="k-gen">Создать ключ подписи</button><label class="btn">Загрузить из резервной копии<input type="file" id="k-imp" accept=".json" hidden></label></div>`
+      : `<p>${match ? `<span class="badge ok">✅ Ключ активен, опубликован в каталоге</span>` : `<span class="badge err">Открытая часть не совпадает с каталогом</span> <button class="btn sm" id="k-pub">Опубликовать открытую часть</button>`}</p>
+        <div class="row"><button class="btn" id="k-backup">💾 Скачать резервную копию</button><label class="btn">Загрузить другую копию<input type="file" id="k-imp" accept=".json" hidden></label></div>`}</div>
+    ${k && match ? `<div class="card"><b>Выдать ключ</b>
+      ${paid.length ? `<div class="row">
+        <label class="field"><span>Плагин</span><select class="input" id="i-plugin">${paid.map((p) => `<option value="${esc(p.id)}">${esc(state.listing[p.id]?.name || p.manifest?.name || p.id)} — ${state.listing[p.id].price} ${esc(state.settings.currency || "₽")}</option>`).join("")}</select></label>
+        <label class="field"><span>ID FunPay покупателя (пусто — ключ работает у любого)</span><input class="input" id="i-user" inputmode="numeric" placeholder="1234567"></label></div>
+        <label class="field"><span>Заметка для себя (кто, за сколько, номер заказа)</span><input class="input" id="i-note"></label>
+        <button class="btn primary" id="i-go">Выдать ключ</button><div id="i-out" style="margin-top:10px"></div>`
+      : `<p class="muted">Нет платных плагинов — поставь цену в «Изменить».</p>`}</div>` : ""}
+    <div class="card"><b>Выданные ключи</b> <span class="muted">(список хранится в этом браузере)</span>
+      ${issued.length ? `<table><tr><th>Когда</th><th>Плагин</th><th>ID покупателя</th><th>Заметка</th><th></th></tr>${issued.slice().reverse().map((x) => `<tr><td>${new Date(x.t).toLocaleString("ru-RU")}</td><td>${esc(x.p)}</td><td>${esc(x.u || "любой")}</td><td>${esc(x.note || "")}</td>
+        <td>${revoked.has(x.k) ? `<span class="badge err">отозван</span>` : `<button class="btn sm" data-copy="${esc(x.key)}">Копировать</button> <button class="btn sm danger" data-revoke="${esc(x.k)}">Отозвать</button>`}</td></tr>`).join("")}</table>` : `<p class="muted">Пока ни одного.</p>`}</div>`;
+
+  const publishPub = async (x) => {
+    const settings = { ...state.settings, licensePublicKey: x };
+    await commit([{ path: "catalog/settings.json", data: json(settings) }], "Открытый ключ лицензий");
+    state.settings = settings;
+  };
+  $("#k-gen") && ($("#k-gen").onclick = (e) => busy(e.target, async () => {
+    if (pub && !confirm("В каталоге уже есть другой открытый ключ. Все выданные раньше ключи перестанут работать. Продолжить?")) return;
+    const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+    const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
+    store(LS.key, jwk);
+    download("funpay-flux-license-key.json", JSON.stringify(jwk));
+    await publishPub(jwk.x);
+    toast("Ключ создан, резервная копия скачана — спрячь её");
+    render();
+  }));
+  $("#k-imp") && ($("#k-imp").onchange = (e) => busy(null, async () => {
+    const jwk = JSON.parse(await e.target.files[0].text());
+    if (jwk.crv !== "Ed25519" || !jwk.d || !jwk.x) throw new Error("Это не резервная копия ключа подписи");
+    await crypto.subtle.importKey("jwk", jwk, { name: "Ed25519" }, false, ["sign"]);
+    store(LS.key, jwk);
+    toast("Ключ загружен");
+    render();
+  }));
+  $("#k-pub") && ($("#k-pub").onclick = (e) => busy(e.target, async () => {
+    if (pub && !confirm("Заменить открытый ключ в каталоге? Ключи, выданные другим секретным ключом, перестанут работать.")) return;
+    await publishPub(k.x); saved(); render();
+  }));
+  $("#k-backup") && ($("#k-backup").onclick = () => download("funpay-flux-license-key.json", JSON.stringify(k)));
+  $("#i-go") && ($("#i-go").onclick = (e) => busy(e.target, async () => {
+    const u = $("#i-user").value.trim();
+    if (u && !/^\d{1,12}$/.test(u)) throw new Error("ID FunPay — только цифры");
+    const payload = { v: 1, k: b64url(crypto.getRandomValues(new Uint8Array(6))), p: $("#i-plugin").value, u: u ? Number(u) : 0, t: Date.now() };
+    const body = b64url(enc.encode(JSON.stringify(payload)));
+    const sig = new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, await importPrivate(), enc.encode(body)));
+    const key = `FPF1.${body}.${b64url(sig)}`;
+    const list = load(LS.issued, []);
+    list.push({ ...payload, note: $("#i-note").value.trim(), key });
+    store(LS.issued, list);
+    const plugin = $("#i-plugin").value;
+    viewKeys(el); // обновить список выданных
+    $("#i-plugin").value = plugin;
+    $("#i-out").innerHTML = `<p>Ключ для покупателя:</p><div class="key-out">${esc(key)}</div><button class="btn sm" style="margin-top:8px" id="i-copy">Копировать</button>`;
+    $("#i-copy").onclick = () => navigator.clipboard.writeText(key).then(() => toast("Скопировано"));
+  }));
+  $$("[data-copy]", el).forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => toast("Скопировано"))));
+  $$("[data-revoke]", el).forEach((b) => (b.onclick = () => confirm("Отозвать ключ? У покупателя плагин перестанет включаться.") && busy(b, async () => {
+    const settings = { ...state.settings, revoked: [...new Set([...(state.settings.revoked || []), b.dataset.revoke])] };
+    await commit([{ path: "catalog/settings.json", data: json(settings) }], "Отозван ключ");
+    state.settings = settings; saved(); render();
+  })));
+}
+
+function viewSettings(el) {
+  const s = state.settings;
+  el.innerHTML = `<div class="card">
+      <label class="field"><span>Название каталога</span><input class="input" id="s-name" value="${esc(s.storeName || "")}"></label>
+      <label class="field" style="max-width:160px"><span>Валюта</span><input class="input" id="s-cur" value="${esc(s.currency || "₽")}"></label>
+      <button class="btn primary" id="s-save">Сохранить</button></div>
+    <div class="card"><b>Адреса</b>
+      <p class="muted">Каталог для приложения: <code>${esc(state.pagesUrl)}/catalog.json</code><br>Эта админка: <code>${esc(state.pagesUrl)}/admin/</code><br>Инструкция для разработчиков: <a href="https://github.com/${esc(state.repoName)}#readme" target="_blank">README репозитория</a></p></div>
+    <div class="card"><b>Discord</b><p class="muted">Уведомления «надо посмотреть / протестировать» приходят из GitHub Actions. Вебхук задаётся в GitHub → Settings → Secrets and variables → Actions → <code>DISCORD_WEBHOOK</code>.</p>
+      <a class="btn" href="https://github.com/${esc(state.repoName)}/settings/secrets/actions" target="_blank">Открыть секреты репозитория</a></div>`;
+  $("#s-save").onclick = (e) => busy(e.target, async () => {
+    const settings = { ...s, storeName: $("#s-name").value.trim() || "Каталог плагинов FunPay Flux", currency: $("#s-cur").value.trim() || "₽" };
+    await commit([{ path: "catalog/settings.json", data: json(settings) }], "Настройки каталога");
+    state.settings = settings; saved(); render();
+  });
+}
+
+(async () => {
+  if (!crypto.subtle || !window.DecompressionStream) {
+    $("#root").innerHTML = `<div class="card login">Браузер слишком старый — открой админку в свежем Chrome, Edge или Firefox.</div>`;
+    return;
+  }
+  if (cfg.repo && cfg.token) {
+    $("#root").innerHTML = `<p class="muted">Загружаю каталог из GitHub…</p>`;
+    try { await loadState(); } catch (e) { toast(e.message, true); state = null; }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
