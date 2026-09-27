@@ -1,0 +1,14 @@
+{
+  "id": "ping-pong",
+  "name": "Пинг-понг",
+  "version": "1.0.0",
+  "author": "FunPay Flux",
+  "description": "Пример плагина: отвечает на команду !ping. С него удобно начать свой плагин.",
+  "icon": "🏓",
+  "main": "main.js",
+  "permissions": ["chat"],
+  "settings": [
+    { "key": "command", "type": "text", "label": "Команда", "default": "!ping" },
+    { "key": "answer", "type": "text", "label": "Что отвечать", "default": "pong 🏓", "help": "Можно вставить {buyer} — подставится ник покупателя" }
+  ]
+}
