@@ -1,0 +1,4 @@
+{
+  "ping-pong": { "price": 0, "category": "Чат", "featured": true },
+  "order-counter": { "price": 0, "category": "Продажи" }
+}
